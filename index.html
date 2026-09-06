@@ -1,0 +1,1408 @@
+<!DOCTYPE html>
+
+<html class="h-full bg-[#F8FAFC]" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>FlowOps Freight - Intelligent Dispatch &amp; Marketplace</title>
+<!-- Tailwind CSS v3 with Plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Google Fonts: Plus Jakarta Sans -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@500;600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #F1F5F9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #CBD5E1;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94A3B8;
+    }
+    .fade-in {
+      animation: fadeIn 0.2s ease-in-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .toast-slide {
+      animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes slideIn {
+      from { transform: translateX(120%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+  </style>
+</head>
+<body class="min-h-full bg-[#F8FAFC] text-slate-900 flex flex-col antialiased selection:bg-blue-100 selection:text-blue-700">
+<!-- Toast Notification Container -->
+<div class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none" id="toast-container"></div>
+<!-- Confirmation Modal: Assign Truck -->
+<div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4" id="assign-modal">
+<div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 fade-in">
+<div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mb-4">
+<span class="material-symbols-outlined text-2xl">local_shipping</span>
+</div>
+<h3 class="text-xl font-black text-slate-900">Confirm Trip Dispatch</h3>
+<p class="text-xs text-slate-500 mt-1.5 leading-relaxed">
+        You are about to assign <span class="font-bold text-slate-900" id="modal-truck-id">Unit #204</span> to requirement <span class="font-bold text-slate-900" id="modal-req-id">IP-19320</span>. Driver rate confirmation will be dispatched automatically.
+      </p>
+<div class="mt-4 p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-1.5">
+<div class="flex justify-between"><span class="text-slate-500">Route:</span><span class="font-bold text-slate-800" id="modal-route">Dallas, TX → Atlanta, GA</span></div>
+<div class="flex justify-between"><span class="text-slate-500">Driver:</span><span class="font-bold text-slate-800" id="modal-driver">Marcus Vance</span></div>
+<div class="flex justify-between"><span class="text-slate-500">Est. Contribution:</span><span class="font-bold text-emerald-600" id="modal-contribution">$1,840</span></div>
+</div>
+<div class="mt-6 flex items-center justify-end space-x-3">
+<button class="px-4 py-2 rounded-lg border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 transition-colors" onclick="closeAssignModal()" type="button">Cancel</button>
+<button class="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md transition-all flex items-center space-x-1.5" onclick="confirmAssignTruck()" type="button">
+<span>Confirm &amp; Dispatch</span>
+<span>→</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Bid Modal: Place / Update Bid -->
+<div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4" id="bid-modal">
+<div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 fade-in">
+<div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mb-4">
+<span class="material-symbols-outlined text-2xl">request_quote</span>
+</div>
+<h3 class="text-xl font-black text-slate-900">Revise Bid Proposal</h3>
+<p class="text-xs text-slate-500 mt-1.5" id="bid-modal-subtitle">Submitting revision for ST-77411 • BuildCore Materials</p>
+<div class="mt-4 space-y-3">
+<div>
+<label class="block text-xs font-bold text-slate-700 mb-1">Your All-In Rate ($ USD)</label>
+<input class="w-full text-sm rounded-lg border-slate-200 focus:border-blue-600 focus:ring-blue-600 py-2.5 px-3 font-mono font-bold" id="bid-rate-input" type="number" value="2150"/>
+</div>
+<div>
+<label class="block text-xs font-bold text-slate-700 mb-1">Equipment / Notes</label>
+<input class="w-full text-sm rounded-lg border-slate-200 focus:border-blue-600 focus:ring-blue-600 py-2.5 px-3" id="bid-notes-input" type="text" value="53ft Flatbed • Ready with coil racks &amp; tarps"/>
+</div>
+</div>
+<div class="mt-6 flex items-center justify-end space-x-3">
+<button class="px-4 py-2 rounded-lg border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 transition-colors" onclick="closeBidModal()" type="button">Dismiss</button>
+<button class="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md transition-all" onclick="submitBidRevision()" type="button">Submit Revision</button>
+</div>
+</div>
+</div>
+<!-- BEGIN: TopNavigationBar -->
+<header class="h-16 bg-white border-b border-slate-200 sticky top-0 z-40 px-6 flex items-center justify-between shrink-0 shadow-sm">
+<!-- Brand Logo Left -->
+<div class="flex items-center space-x-3 cursor-pointer" onclick="switchCarrierTab('requirements')">
+<span class="text-xl font-extrabold tracking-tight text-slate-950 flex items-center">
+        FlowOps<span class="text-blue-600 ml-1 font-bold">Freight</span>
+</span>
+<span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200 ml-2 hidden sm:inline-block" id="role-tag-pill">Carrier Workspace</span>
+</div>
+<!-- Center Role Switcher -->
+<div class="flex items-center p-1 bg-slate-100/90 rounded-xl border border-slate-200">
+<button class="flex items-center space-x-2 px-4 py-1.5 rounded-lg bg-blue-600 text-white font-semibold text-xs shadow-sm transition-all" id="btn-role-carrier" onclick="switchRole('carrier')" type="button">
+<span>🚚</span>
+<span>Freight Company</span>
+</button>
+<button class="flex items-center space-x-2 px-4 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 font-semibold text-xs transition-all" id="btn-role-shipper" onclick="switchRole('shipper')" type="button">
+<span>🏭</span>
+<span>Shipper / Company</span>
+</button>
+</div>
+<!-- Right Profile Info -->
+<div class="flex items-center space-x-3 text-right">
+<div class="hidden sm:block">
+<div class="text-xs font-bold text-slate-900 leading-tight" id="profile-name">Sarah Jenkins</div>
+<span class="text-[11px] font-semibold text-slate-500" id="profile-company">Apex Logistics LLC</span>
+</div>
+<div class="h-9 w-9 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-700 font-bold text-xs shadow-xs" id="profile-avatar">
+        SJ
+      </div>
+</div>
+</header>
+<!-- END: TopNavigationBar -->
+<!-- BEGIN: Layout Wrapper -->
+<div class="flex-1 flex min-h-[calc(100vh-4rem)]">
+<!-- ========================================== -->
+<!-- BEGIN: LeftSidebar (Carrier & Shipper modes) -->
+<!-- ========================================== -->
+<aside class="w-64 bg-[#0B132B] flex flex-col justify-between shrink-0 hidden lg:flex border-r border-slate-900">
+<div class="p-5">
+<!-- Section Category Title -->
+<p class="text-[11px] font-bold uppercase tracking-wider text-slate-400 px-3 mb-4" id="sidebar-role-label">
+          FREIGHT COMPANY
+        </p>
+<!-- Nav Links: Carrier Mode -->
+<nav class="space-y-1" id="carrier-nav">
+<button class="w-full flex items-center px-3.5 py-2.5 rounded-lg text-slate-300 hover:bg-white/5 hover:text-white text-sm font-medium transition-colors text-left" id="nav-carrier-overview" onclick="switchCarrierTab('overview')">
+<span class="material-symbols-outlined text-[18px] mr-2.5 opacity-70">dashboard</span>
+            Overview
+          </button>
+<button class="w-full flex items-center px-3.5 py-2.5 rounded-lg bg-[#1E293B] text-white text-sm font-semibold shadow-inner transition-colors text-left" id="nav-carrier-requirements" onclick="switchCarrierTab('requirements')">
+<span class="material-symbols-outlined text-[18px] mr-2.5 text-blue-400">local_shipping</span>
+            Freight Requirements
+            <span class="ml-auto text-[10px] font-extrabold bg-blue-500 text-white px-2 py-0.5 rounded-full" id="nav-badge-reqs">5</span>
+</button>
+<button class="w-full flex items-center px-3.5 py-2.5 rounded-lg text-slate-300 hover:bg-white/5 hover:text-white text-sm font-medium transition-colors text-left" id="nav-carrier-fleet" onclick="switchCarrierTab('fleet')">
+<span class="material-symbols-outlined text-[18px] mr-2.5 opacity-70">rv_hookup</span>
+            My Fleet
+            <span class="ml-auto text-[10px] font-bold text-slate-400">4 trucks</span>
+</button>
+<button class="w-full flex items-center px-3.5 py-2.5 rounded-lg text-slate-300 hover:bg-white/5 hover:text-white text-sm font-medium transition-colors text-left" id="nav-carrier-bids" onclick="switchCarrierTab('bids')">
+<span class="material-symbols-outlined text-[18px] mr-2.5 opacity-70">request_quote</span>
+            My Bids
+            <span class="ml-auto text-[10px] font-bold bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded">3 live</span>
+</button>
+<button class="w-full flex items-center px-3.5 py-2.5 rounded-lg text-slate-300 hover:bg-white/5 hover:text-white text-sm font-medium transition-colors text-left" id="nav-carrier-assigned" onclick="switchCarrierTab('assigned')">
+<span class="material-symbols-outlined text-[18px] mr-2.5 opacity-70">fact_check</span>
+            Assigned Trips
+            <span class="ml-auto text-[10px] font-bold bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded" id="nav-assigned-count">2 active</span>
+</button>
+</nav>
+<!-- Nav Links: Shipper Mode (Hidden by default) -->
+<nav class="space-y-1 hidden" id="shipper-nav">
+<button class="w-full flex items-center px-3.5 py-2.5 rounded-lg bg-[#1E293B] text-white text-sm font-semibold shadow-inner transition-colors text-left" id="nav-shipper-procurement" onclick="switchShipperTab('procurement')">
+<span class="material-symbols-outlined text-[18px] mr-2.5 text-blue-400">gavel</span>
+            Compare Carrier Bids
+            <span class="ml-auto text-[10px] font-bold bg-blue-500 text-white px-2 py-0.5 rounded-full">4 Bids</span>
+</button>
+<button class="w-full flex items-center px-3.5 py-2.5 rounded-lg text-slate-300 hover:bg-white/5 hover:text-white text-sm font-medium transition-colors text-left" id="nav-shipper-myloads" onclick="switchShipperTab('my-loads')">
+<span class="material-symbols-outlined text-[18px] mr-2.5 opacity-70">inventory_2</span>
+            My Requirements
+          </button>
+<button class="w-full flex items-center px-3.5 py-2.5 rounded-lg text-slate-300 hover:bg-white/5 hover:text-white text-sm font-medium transition-colors text-left" id="nav-shipper-postload" onclick="switchShipperTab('post-load')">
+<span class="material-symbols-outlined text-[18px] mr-2.5 opacity-70">add_circle</span>
+            Post Requirement
+          </button>
+</nav>
+</div>
+<!-- Bottom Workspace Box -->
+<div class="p-5 border-t border-slate-800 bg-[#080E20]">
+<p class="text-[11px] text-slate-400 font-medium">Operating workspace</p>
+<p class="text-xs font-semibold text-slate-200 mt-0.5" id="sidebar-hub-name">Midwest &amp; Texas Operations Hub</p>
+<div class="mt-3 flex items-center gap-2 pt-2 border-t border-slate-800/80">
+<div class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
+<span class="text-[10px] font-mono text-emerald-400">FlowOps Engine Online</span>
+</div>
+</div>
+</aside>
+<!-- END: LeftSidebar -->
+<!-- ========================================== -->
+<!-- BEGIN: Main Content Area -->
+<!-- ========================================== -->
+<main class="flex-1 min-w-0 p-6 md:p-8 pb-16 space-y-7 overflow-y-auto">
+<!-- ========================================== -->
+<!-- VIEW 1: CARRIER -> FREIGHT REQUIREMENTS (ACTIVE DEFAULT) -->
+<!-- ========================================== -->
+<section class="space-y-7" id="view-carrier-requirements">
+<!-- Header -->
+<div class="space-y-1">
+<span class="text-[11px] font-extrabold uppercase tracking-widest text-slate-500">
+            MARKETPLACE
+          </span>
+<h1 class="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">
+            Freight Requirements
+          </h1>
+<p class="text-sm text-slate-500 max-w-3xl">
+            Every shipment posted by companies. Filter it, open it, and let FlowOps choose your best truck.
+          </p>
+</div>
+<!-- Filter Card -->
+<div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+<div class="flex items-center justify-between mb-4">
+<h2 class="text-base font-bold text-slate-900 tracking-tight">Search requirements</h2>
+<div class="flex items-center space-x-3">
+<span class="text-xs font-semibold text-slate-500" id="filter-count-label">5 requirements</span>
+<button class="hidden text-xs text-blue-600 hover:text-blue-800 font-bold underline cursor-pointer" id="reset-filter-btn" onclick="resetFilters()">Reset filters</button>
+</div>
+</div>
+<form class="space-y-4" onsubmit="event.preventDefault(); applyRequirementFilters();">
+<!-- Row 1 -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+<div>
+<label class="block text-xs font-bold text-slate-700 mb-1.5" for="starting-point">Starting point</label>
+<input class="w-full text-sm rounded-lg border-slate-200 focus:border-blue-600 focus:ring-blue-600 bg-white text-slate-900 placeholder:text-slate-400 py-2.5 px-3" id="starting-point" placeholder="e.g. Dallas, TX" type="text" value=""/>
+</div>
+<div>
+<label class="block text-xs font-bold text-slate-700 mb-1.5" for="destination-city">Destination city</label>
+<input class="w-full text-sm rounded-lg border-slate-200 focus:border-blue-600 focus:ring-blue-600 bg-white text-slate-900 placeholder:text-slate-400 py-2.5 px-3" id="destination-city" placeholder="e.g. Atlanta, GA" type="text" value=""/>
+</div>
+<div>
+<label class="block text-xs font-bold text-slate-700 mb-1.5" for="load-product">Load / product</label>
+<input class="w-full text-sm rounded-lg border-slate-200 focus:border-blue-600 focus:ring-blue-600 bg-white text-slate-900 placeholder:text-slate-400 py-2.5 px-3" id="load-product" placeholder="e.g. Industrial, Auto" type="text" value=""/>
+</div>
+</div>
+<!-- Row 2 -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+<div>
+<label class="block text-xs font-bold text-slate-700 mb-1.5" for="vehicle-type">Vehicle type</label>
+<select class="w-full text-sm rounded-lg border-slate-200 focus:border-blue-600 focus:ring-blue-600 bg-white text-slate-900 py-2.5 px-3" id="vehicle-type">
+<option value="ALL">All Vehicle Types</option>
+<option value="53 ft Flatbed">53 ft Flatbed</option>
+<option value="53 ft Dry Van">53 ft Dry Van</option>
+<option value="53 ft Reefer">53 ft Reefer</option>
+<option value="Step Deck">Step Deck</option>
+</select>
+</div>
+<div>
+<label class="block text-xs font-bold text-slate-700 mb-1.5" for="min-capacity">Minimum load capacity</label>
+<select class="w-full text-sm rounded-lg border-slate-200 focus:border-blue-600 focus:ring-blue-600 bg-white text-slate-900 py-2.5 px-3" id="min-capacity">
+<option value="0">Any weight</option>
+<option value="45000">45,000 lbs</option>
+<option value="40000">40,000 lbs</option>
+<option value="35000">35,000 lbs</option>
+<option value="25000">25,000 lbs</option>
+</select>
+</div>
+<div class="flex gap-2">
+<button class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm py-2.5 px-4 rounded-lg shadow-sm transition-colors flex items-center justify-center cursor-pointer" type="submit">
+                  Apply filters
+                </button>
+</div>
+</div>
+</form>
+</div>
+<!-- Requirements Table -->
+<div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse" id="requirements-table">
+<thead>
+<tr class="border-b border-slate-200 bg-slate-50/70">
+<th class="py-3.5 px-4 text-[11px] font-extrabold uppercase tracking-wider text-slate-500" scope="col">Company / Requirement</th>
+<th class="py-3.5 px-4 text-[11px] font-extrabold uppercase tracking-wider text-slate-500" scope="col">Route</th>
+<th class="py-3.5 px-4 text-[11px] font-extrabold uppercase tracking-wider text-slate-500" scope="col">Product</th>
+<th class="py-3.5 px-4 text-[11px] font-extrabold uppercase tracking-wider text-slate-500" scope="col">Weight</th>
+<th class="py-3.5 px-4 text-[11px] font-extrabold uppercase tracking-wider text-slate-500" scope="col">Vehicle</th>
+<th class="py-3.5 px-4 text-[11px] font-extrabold uppercase tracking-wider text-slate-500" scope="col">Pickup</th>
+<th class="py-3.5 px-4 text-[11px] font-extrabold uppercase tracking-wider text-slate-500 text-center" scope="col">Fleet Fit</th>
+<th class="py-3.5 px-4 text-[11px] font-extrabold uppercase tracking-wider text-slate-500 text-right" scope="col">Action</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-100 text-sm" id="requirements-table-body">
+<!-- Populated dynamically via renderRequirementsTable() -->
+</tbody>
+</table>
+</div>
+</div>
+<!-- BEGIN: Detailed Selected Load & Dispatch Intelligence Drawer / Card -->
+<section class="bg-white rounded-xl border border-slate-200 shadow-md p-6 space-y-6 transition-all duration-200" data-purpose="active-assignment-drawer" id="load-detail-drawer">
+<!-- Card Header -->
+<div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-4 gap-3">
+<div>
+<div class="flex items-center space-x-2">
+<span class="text-[11px] font-extrabold uppercase tracking-widest text-slate-400" id="detail-tag-header">IP-19320 • PRIME ENGINEERING</span>
+<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700" id="detail-status-pill">Ready for Assignment</span>
+</div>
+<h2 class="text-xl md:text-2xl font-black text-slate-950 mt-1" id="detail-route-title">Dallas, TX → Atlanta, GA</h2>
+<p class="text-xs font-medium text-slate-500 mt-0.5" id="detail-summary-line">Industrial pumps &amp; valves • 44,000 lbs • 53 ft Flatbed</p>
+</div>
+<button class="self-start sm:self-center px-4 py-1.5 rounded-lg border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 transition-colors cursor-pointer" onclick="closeDetailDrawer()" type="button">
+              Close
+            </button>
+</div>
+<!-- 2-Column Grid -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+<!-- Left Column: Requirement details -->
+<div class="lg:col-span-6 space-y-4">
+<h3 class="text-sm font-extrabold text-slate-900 tracking-tight">Requirement details</h3>
+<!-- 6 metric tiles -->
+<div class="grid grid-cols-3 gap-2.5">
+<div class="p-3 bg-slate-50/80 rounded-lg border border-slate-100">
+<span class="text-[11px] font-medium text-slate-400 block">Pickup</span>
+<span class="text-xs font-bold text-slate-800 mt-0.5 block leading-tight" id="detail-pickup">Aug 11 • 8:00 AM CST</span>
+</div>
+<div class="p-3 bg-slate-50/80 rounded-lg border border-slate-100">
+<span class="text-[11px] font-medium text-slate-400 block">Deadline</span>
+<span class="text-xs font-bold text-slate-800 mt-0.5 block leading-tight" id="detail-deadline">Aug 13 • 5:00 PM EST</span>
+</div>
+<div class="p-3 bg-slate-50/80 rounded-lg border border-slate-100">
+<span class="text-[11px] font-medium text-slate-400 block">Bids</span>
+<span class="text-xs font-bold text-slate-800 mt-0.5 block leading-tight" id="detail-bids">7 bids</span>
+</div>
+<div class="p-3 bg-slate-50/80 rounded-lg border border-slate-100">
+<span class="text-[11px] font-medium text-slate-400 block">Product</span>
+<span class="text-xs font-bold text-slate-800 mt-0.5 block leading-tight truncate" id="detail-product">Industrial pumps</span>
+</div>
+<div class="p-3 bg-slate-50/80 rounded-lg border border-slate-100">
+<span class="text-[11px] font-medium text-slate-400 block">Weight</span>
+<span class="text-xs font-bold text-slate-800 mt-0.5 block leading-tight" id="detail-weight">44,000 lbs</span>
+</div>
+<div class="p-3 bg-slate-50/80 rounded-lg border border-slate-100">
+<span class="text-[11px] font-medium text-slate-400 block">Vehicle</span>
+<span class="text-xs font-bold text-slate-800 mt-0.5 block leading-tight truncate" id="detail-vehicle">53 ft Flatbed</span>
+</div>
+</div>
+<!-- Facility Instructions Box -->
+<div class="p-3.5 bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-700 leading-relaxed">
+<span class="font-bold text-slate-900">Instructions:</span> <span id="detail-instructions">Facility overhead crane loading available. Requires chains and 8ft drop tarps. Driver must check in by 07:30 AM CST.</span>
+</div>
+</div>
+<!-- Right Column: FlowOps Dispatch Intelligence Card -->
+<div class="lg:col-span-6 bg-blue-50/40 rounded-xl border border-blue-100 p-5 space-y-4 shadow-xs">
+<div class="flex items-center justify-between border-b border-blue-100 pb-3">
+<div>
+<p class="text-[10px] font-extrabold tracking-wider text-blue-700 uppercase">FLOWOPS DISPATCH INTELLIGENCE</p>
+<h4 class="text-base font-extrabold text-slate-900">Recommended truck</h4>
+</div>
+<span class="text-3xl font-black text-blue-600" id="detail-fit-score">99%</span>
+</div>
+<div>
+<h5 class="text-base font-black text-slate-900" id="detail-truck-title">Unit #204 • Freightliner Cascadia</h5>
+<p class="text-xs font-medium text-slate-500" id="detail-truck-subtitle">53 ft Flatbed • 48,000 lbs max payload</p>
+<span class="inline-block mt-1 text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100" id="detail-driver-badge">
+                  Driver: Marcus Vance
+                </span>
+</div>
+<!-- Algorithm Bullet Points -->
+<ul class="space-y-1.5 text-xs text-slate-600" id="detail-reasons-list">
+<li class="flex items-start">
+<span class="w-1.5 h-1.5 rounded-full bg-blue-600 mr-2 mt-1.5 shrink-0"></span>
+<span><strong id="detail-deadhead-text">18 miles</strong> from pickup (Staged in Arlington, TX)</span>
+</li>
+<li class="flex items-start">
+<span class="w-1.5 h-1.5 rounded-full bg-blue-600 mr-2 mt-1.5 shrink-0"></span>
+<span>Available <strong id="detail-available-time">Today • 5:40 PM CST</strong></span>
+</li>
+<li class="flex items-start">
+<span class="w-1.5 h-1.5 rounded-full bg-blue-600 mr-2 mt-1.5 shrink-0"></span>
+<span>Completing <strong id="detail-prior-route">Houston → Dallas</strong> inbound route</span>
+</li>
+<li class="flex items-start">
+<span class="w-1.5 h-1.5 rounded-full bg-blue-600 mr-2 mt-1.5 shrink-0"></span>
+<span>Capacity covers the <strong id="detail-capacity-cover">44,000 lbs</strong> requirement</span>
+</li>
+<li class="flex items-start">
+<span class="w-1.5 h-1.5 rounded-full bg-blue-600 mr-2 mt-1.5 shrink-0"></span>
+<span>Vehicle type and equipment certified</span>
+</li>
+</ul>
+<!-- Economics Grid -->
+<div class="grid grid-cols-2 gap-3 pt-1">
+<div class="p-3 bg-white rounded-lg border border-slate-200 shadow-xs">
+<span class="text-[10px] text-slate-500 font-bold uppercase block">Deadhead</span>
+<span class="text-sm font-black text-slate-900" id="detail-deadhead-stat">18 mi</span>
+</div>
+<div class="p-3 bg-white rounded-lg border border-slate-200 shadow-xs">
+<span class="text-[10px] text-slate-500 font-bold uppercase block">Est. contribution</span>
+<span class="text-sm font-black text-emerald-600" id="detail-contribution-stat">$1,840</span>
+</div>
+</div>
+<!-- Primary Action CTA -->
+<button class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm py-3 px-4 rounded-lg shadow-sm transition-all flex items-center justify-center space-x-1 cursor-pointer" onclick="openAssignModal()" type="button">
+<span id="btn-assign-text">Assign this truck</span>
+<span>→</span>
+</button>
+</div>
+</div>
+</section>
+<!-- END: Detailed Selected Load & Dispatch Intelligence Drawer / Card -->
+</section>
+<!-- ========================================== -->
+<!-- VIEW 2: CARRIER -> OVERVIEW (KPI & Operational Health) -->
+<!-- ========================================== -->
+<section class="space-y-6 hidden" id="view-carrier-overview">
+<div class="space-y-1">
+<span class="text-[11px] font-extrabold uppercase tracking-widest text-slate-500">CARRIER DASHBOARD</span>
+<h1 class="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">Fleet Operations Overview</h1>
+<p class="text-sm text-slate-500">Live corridor analysis and automated dispatch optimization metrics.</p>
+</div>
+<!-- 4 KPI Cards -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+<div class="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
+<div class="flex items-center justify-between text-slate-400 mb-2">
+<span class="text-xs font-bold uppercase tracking-wider">Potential Contribution</span>
+<span class="material-symbols-outlined text-emerald-500">payments</span>
+</div>
+<div class="text-2xl font-black text-slate-900 font-mono">$18,420</div>
+<p class="text-xs text-emerald-600 font-semibold mt-1">+$3,210 vs last week</p>
+</div>
+<div class="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
+<div class="flex items-center justify-between text-slate-400 mb-2">
+<span class="text-xs font-bold uppercase tracking-wider">Empty Miles Avoided</span>
+<span class="material-symbols-outlined text-blue-500">conversion_path</span>
+</div>
+<div class="text-2xl font-black text-slate-900 font-mono">1,240 mi</div>
+<p class="text-xs text-blue-600 font-semibold mt-1">FlowOps backhaul match</p>
+</div>
+<div class="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
+<div class="flex items-center justify-between text-slate-400 mb-2">
+<span class="text-xs font-bold uppercase tracking-wider">Trucks Emptying Soon</span>
+<span class="material-symbols-outlined text-amber-500">fmd_bad</span>
+</div>
+<div class="text-2xl font-black text-slate-900 font-mono">3 Units</div>
+<p class="text-xs text-amber-600 font-semibold mt-1">Need loads within 4 hrs</p>
+</div>
+<div class="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
+<div class="flex items-center justify-between text-slate-400 mb-2">
+<span class="text-xs font-bold uppercase tracking-wider">Active Win Rate</span>
+<span class="material-symbols-outlined text-indigo-500">trending_up</span>
+</div>
+<div class="text-2xl font-black text-slate-900 font-mono">78.4%</div>
+<p class="text-xs text-indigo-600 font-semibold mt-1">Direct broker acceptance</p>
+</div>
+</div>
+<!-- Corridors & Quick Actions -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+<div class="lg:col-span-2 bg-white rounded-xl border border-slate-200 p-5 shadow-xs">
+<div class="flex items-center justify-between mb-4">
+<h2 class="text-base font-bold text-slate-900">Highest Yield Active Corridors</h2>
+<span class="text-xs text-slate-500">Auto-calculated</span>
+</div>
+<div class="space-y-3">
+<div class="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-100">
+<div>
+<p class="text-xs font-bold text-slate-900">Dallas, TX → Houston, TX</p>
+<p class="text-[11px] text-slate-500">Avg. $3.24 / mile • 14 requirements posted</p>
+</div>
+<button class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-bold text-blue-600 hover:bg-blue-50" onclick="filterByCorridor('Dallas, TX', 'Houston, TX')">Filter Loads</button>
+</div>
+<div class="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-100">
+<div>
+<p class="text-xs font-bold text-slate-900">Dallas, TX → Atlanta, GA</p>
+<p class="text-[11px] text-slate-500">Avg. $2.95 / mile • 8 requirements posted</p>
+</div>
+<button class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-bold text-blue-600 hover:bg-blue-50" onclick="filterByCorridor('Dallas, TX', 'Atlanta, GA')">Filter Loads</button>
+</div>
+<div class="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-100">
+<div>
+<p class="text-xs font-bold text-slate-900">Houston, TX → San Antonio, TX</p>
+<p class="text-[11px] text-slate-500">Avg. $3.60 / mile • 6 requirements posted</p>
+</div>
+<button class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-bold text-blue-600 hover:bg-blue-50" onclick="filterByCorridor('Houston, TX', 'San Antonio, TX')">Filter Loads</button>
+</div>
+</div>
+</div>
+<div class="bg-white rounded-xl border border-slate-200 p-5 shadow-xs flex flex-col justify-between">
+<div>
+<h2 class="text-base font-bold text-slate-900 mb-2">Automated Fleet Match</h2>
+<p class="text-xs text-slate-500 leading-relaxed">
+                Unit #204 is uncommitted in Arlington after 5:40 PM. There is a 99% fleet fit load pending assignment.
+              </p>
+</div>
+<div class="p-3 bg-blue-50/70 rounded-lg border border-blue-100 my-4">
+<span class="text-[10px] font-black uppercase text-blue-700 block">Prime Recommendation</span>
+<span class="text-xs font-bold text-slate-900 block mt-0.5">IP-19320 (Dallas → Atlanta)</span>
+<span class="text-xs text-emerald-600 font-bold font-mono">+$1,840 Net margin</span>
+</div>
+<button class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm" onclick="switchCarrierTab('requirements')">
+              Review &amp; Assign Load →
+            </button>
+</div>
+</div>
+</section>
+<!-- ========================================== -->
+<!-- VIEW 3: CARRIER -> MY FLEET -->
+<!-- ========================================== -->
+<section class="space-y-6 hidden" id="view-carrier-fleet">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+<div>
+<span class="text-[11px] font-extrabold uppercase tracking-widest text-slate-500">FLEET ASSETS</span>
+<h1 class="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">Active Trucks &amp; Drivers</h1>
+<p class="text-sm text-slate-500">Monitor driver locations and match empties with available loads.</p>
+</div>
+<button class="px-4 py-2 bg-slate-900 text-white font-bold text-xs rounded-lg hover:bg-slate-800" onclick="showToast('Truck registration portal opened')">
+            + Add Truck
+          </button>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5" id="fleet-cards-grid">
+<!-- Truck 1 -->
+<div class="bg-white rounded-xl border border-slate-200 p-5 shadow-xs space-y-4">
+<div class="flex items-start justify-between">
+<div>
+<span class="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase bg-amber-50 text-amber-700 border border-amber-100">Emptying Soon</span>
+<h3 class="text-base font-black text-slate-900 mt-1.5">Unit #204 • Freightliner Cascadia</h3>
+<p class="text-xs text-slate-500">53 ft Flatbed • 48,000 lbs max</p>
+</div>
+<span class="w-3 h-3 rounded-full bg-amber-500"></span>
+</div>
+<div class="p-3 bg-slate-50 rounded-lg border border-slate-100 space-y-1 text-xs">
+<div class="flex justify-between"><span class="text-slate-500">Driver:</span><span class="font-bold text-slate-800">Marcus Vance</span></div>
+<div class="flex justify-between"><span class="text-slate-500">Current Location:</span><span class="font-bold text-slate-800">Arlington, TX</span></div>
+<div class="flex justify-between"><span class="text-slate-500">Ready Time:</span><span class="font-bold text-blue-600">Today • 5:40 PM CST</span></div>
+</div>
+<button class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg shadow-sm transition-colors flex items-center justify-center space-x-1" onclick="findLoadsForTruck('53 ft Flatbed', 'Dallas, TX')">
+<span>Find Next Load for #204</span>
+<span>→</span>
+</button>
+</div>
+<!-- Truck 2 -->
+<div class="bg-white rounded-xl border border-slate-200 p-5 shadow-xs space-y-4">
+<div class="flex items-start justify-between">
+<div>
+<span class="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase bg-emerald-50 text-emerald-700 border border-emerald-100">Available Now</span>
+<h3 class="text-base font-black text-slate-900 mt-1.5">Unit #108 • Kenworth T680</h3>
+<p class="text-xs text-slate-500">53 ft Dry Van • 45,000 lbs max</p>
+</div>
+<span class="w-3 h-3 rounded-full bg-emerald-500"></span>
+</div>
+<div class="p-3 bg-slate-50 rounded-lg border border-slate-100 space-y-1 text-xs">
+<div class="flex justify-between"><span class="text-slate-500">Driver:</span><span class="font-bold text-slate-800">Elena Rostova</span></div>
+<div class="flex justify-between"><span class="text-slate-500">Current Location:</span><span class="font-bold text-slate-800">Dallas Yard (FTW)</span></div>
+<div class="flex justify-between"><span class="text-slate-500">Ready Time:</span><span class="font-bold text-emerald-600">Immediate</span></div>
+</div>
+<button class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg shadow-sm transition-colors flex items-center justify-center space-x-1" onclick="findLoadsForTruck('53 ft Dry Van', 'Dallas, TX')">
+<span>Find Next Load for #108</span>
+<span>→</span>
+</button>
+</div>
+<!-- Truck 3 -->
+<div class="bg-white rounded-xl border border-slate-200 p-5 shadow-xs space-y-4">
+<div class="flex items-start justify-between">
+<div>
+<span class="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase bg-blue-50 text-blue-700 border border-blue-100">In Transit</span>
+<h3 class="text-base font-black text-slate-900 mt-1.5">Unit #312 • Volvo VNL 860</h3>
+<p class="text-xs text-slate-500">53 ft Reefer • 44,000 lbs max</p>
+</div>
+<span class="w-3 h-3 rounded-full bg-blue-500"></span>
+</div>
+<div class="p-3 bg-slate-50 rounded-lg border border-slate-100 space-y-1 text-xs">
+<div class="flex justify-between"><span class="text-slate-500">Driver:</span><span class="font-bold text-slate-800">Derrick Boone</span></div>
+<div class="flex justify-between"><span class="text-slate-500">Heading to:</span><span class="font-bold text-slate-800">San Antonio, TX</span></div>
+<div class="flex justify-between"><span class="text-slate-500">ETA:</span><span class="font-bold text-slate-800">Tomorrow • 11:30 AM</span></div>
+</div>
+<button class="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-lg transition-colors flex items-center justify-center space-x-1" onclick="findLoadsForTruck('53 ft Reefer', 'Houston, TX')">
+<span>Queue Backhaul Load</span>
+</button>
+</div>
+</div>
+</section>
+<!-- ========================================== -->
+<!-- VIEW 4: CARRIER -> MY BIDS -->
+<!-- ========================================== -->
+<section class="space-y-6 hidden" id="view-carrier-bids">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+<div>
+<span class="text-[11px] font-extrabold uppercase tracking-widest text-slate-500">ACTIVE PROPOSALS</span>
+<h1 class="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">Carrier Bids &amp; Tenders</h1>
+<p class="text-sm text-slate-500">Live marketplace bids submitted to direct shippers.</p>
+</div>
+</div>
+<div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b border-slate-200 bg-slate-50/70 text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+<th class="py-3.5 px-4">Load ID &amp; Shipper</th>
+<th class="py-3.5 px-4">Route</th>
+<th class="py-3.5 px-4">Your Bid</th>
+<th class="py-3.5 px-4">Current Status</th>
+<th class="py-3.5 px-4">Competitor Lowest</th>
+<th class="py-3.5 px-4 text-right">Action</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-100 text-sm">
+<tr class="hover:bg-slate-50/70">
+<td class="py-3.5 px-4">
+<div class="font-bold text-slate-900">ST-77411</div>
+<div class="text-xs text-slate-500">BuildCore Materials</div>
+</td>
+<td class="py-3.5 px-4 font-bold text-slate-900">Houston, TX → Dallas, TX</td>
+<td class="py-3.5 px-4 font-bold text-slate-900 font-mono" id="bid-val-ST77411">$2,250</td>
+<td class="py-3.5 px-4">
+<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-extrabold bg-amber-50 text-amber-700">
+                    Under Review
+                  </span>
+</td>
+<td class="py-3.5 px-4 text-xs font-mono text-slate-600">$2,180</td>
+<td class="py-3.5 px-4 text-right">
+<button class="px-3 py-1.5 rounded-lg border border-slate-200 text-blue-600 font-bold text-xs hover:bg-blue-50" onclick="openBidModal('ST-77411', 'BuildCore Materials', 2250)">Revise Bid</button>
+</td>
+</tr>
+<tr class="hover:bg-slate-50/70">
+<td class="py-3.5 px-4">
+<div class="font-bold text-slate-900">AC-48291</div>
+<div class="text-xs text-slate-500">Vertex Motors</div>
+</td>
+<td class="py-3.5 px-4 font-bold text-slate-900">Dallas, TX → Houston, TX</td>
+<td class="py-3.5 px-4 font-bold text-slate-900 font-mono">$1,620</td>
+<td class="py-3.5 px-4">
+<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-extrabold bg-emerald-50 text-emerald-700">
+                    Leader (Lowest)
+                  </span>
+</td>
+<td class="py-3.5 px-4 text-xs font-mono text-slate-600">$1,620</td>
+<td class="py-3.5 px-4 text-right">
+<span class="text-xs font-semibold text-slate-400">Award Pending</span>
+</td>
+</tr>
+<tr class="hover:bg-slate-50/70">
+<td class="py-3.5 px-4">
+<div class="font-bold text-slate-900">FM-20188</div>
+<div class="text-xs text-slate-500">FreshFoods Express</div>
+</td>
+<td class="py-3.5 px-4 font-bold text-slate-900">Dallas, TX → Memphis, TN</td>
+<td class="py-3.5 px-4 font-bold text-slate-900 font-mono">$1,950</td>
+<td class="py-3.5 px-4">
+<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-extrabold bg-rose-50 text-rose-700">
+                    Outbid
+                  </span>
+</td>
+<td class="py-3.5 px-4 text-xs font-mono text-emerald-600 font-bold">$1,800</td>
+<td class="py-3.5 px-4 text-right">
+<button class="px-3 py-1.5 rounded-lg bg-blue-600 text-white font-bold text-xs hover:bg-blue-700" onclick="openBidModal('FM-20188', 'FreshFoods Express', 1780)">Match &amp; Win</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<!-- ========================================== -->
+<!-- VIEW 5: CARRIER -> ASSIGNED TRIPS -->
+<!-- ========================================== -->
+<section class="space-y-6 hidden" id="view-carrier-assigned">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+<div>
+<span class="text-[11px] font-extrabold uppercase tracking-widest text-slate-500">DISPATCH BOARD</span>
+<h1 class="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">Active Dispatched Trips</h1>
+<p class="text-sm text-slate-500">Live telemetry, driver status, and proof of delivery.</p>
+</div>
+</div>
+<div class="space-y-4" id="assigned-trips-container">
+<!-- Item 1 (Default assigned load) -->
+<div class="bg-white rounded-xl border border-slate-200 p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+<div class="space-y-1">
+<div class="flex items-center space-x-2">
+<span class="font-bold text-slate-900 text-base">FG-77102</span>
+<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700">In Transit (Mile 140 / 197)</span>
+</div>
+<p class="text-xs font-semibold text-slate-800">Houston, TX → San Antonio, TX • SouthMart Retail</p>
+<p class="text-xs text-slate-500">Driver: Derrick Boone • Unit #312 Volvo Reefer</p>
+</div>
+<div class="flex items-center space-x-4">
+<div class="text-right">
+<span class="text-[11px] text-slate-400 block font-medium">ETA Destination</span>
+<span class="text-xs font-bold text-slate-900">Today • 3:30 PM CST</span>
+</div>
+<button class="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50" onclick="showToast('Driver checked in: On schedule on I-10 W')">Track GPS</button>
+</div>
+</div>
+</div>
+</section>
+<!-- ========================================== -->
+<!-- VIEW 6: SHIPPER / COMPANY WORKFLOW (ROLE SWITCH) -->
+<!-- ========================================== -->
+<section class="space-y-7 hidden" id="view-shipper-procurement">
+<!-- Header -->
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+<div class="space-y-1">
+<div class="flex items-center space-x-2">
+<span class="text-[11px] font-extrabold uppercase tracking-widest text-slate-500">
+                SHIPPER FREIGHT PROCUREMENT
+              </span>
+<span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-100">
+                Logged in as Vertex Motors
+              </span>
+</div>
+<h1 class="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">
+              Compare Carrier Bids: AC-48291
+            </h1>
+<p class="text-sm text-slate-500 max-w-3xl">
+              Auto components (36,000 lbs) • Dallas, TX → Houston, TX • Pickup: Aug 10 • 9:00 AM CST
+            </p>
+</div>
+<div class="flex items-center space-x-3">
+<button class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg shadow-sm" onclick="showToast('Draft requirement created')">
+              + Post New Requirement
+            </button>
+</div>
+</div>
+<!-- Bids Comparison Cards (Reference Image 9 style) -->
+<div class="space-y-4">
+<div class="flex items-center justify-between">
+<h2 class="text-sm font-extrabold uppercase tracking-wider text-slate-600">4 Verified Carrier Bids Received</h2>
+<span class="text-xs text-slate-500">Ranked by FlowOps Reliability &amp; Price</span>
+</div>
+<!-- Bid 1: Apex Logistics (Best match) -->
+<div class="bg-white rounded-xl border-2 border-blue-500 p-5 shadow-sm space-y-4 relative" id="bid-card-apex">
+<div class="absolute -top-3 right-6 bg-blue-600 text-white text-[10px] font-black uppercase tracking-wider px-3 py-0.5 rounded-full shadow-xs">
+              ★ FlowOps Recommended Winner
+            </div>
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+<div class="flex items-center space-x-3">
+<div class="h-10 w-10 rounded-xl bg-blue-50 text-blue-700 font-black text-sm flex items-center justify-center border border-blue-200">
+                  AL
+                </div>
+<div>
+<h3 class="text-base font-bold text-slate-900">Apex Logistics LLC</h3>
+<p class="text-xs text-slate-500 font-medium">99.4% On-time delivery • 42 trips completed for Vertex</p>
+</div>
+</div>
+<div class="flex items-center space-x-6">
+<div>
+<span class="text-[10px] text-slate-400 font-bold uppercase block">Vehicle Assigned</span>
+<span class="text-xs font-bold text-slate-800">53 ft Dry Van (#108)</span>
+</div>
+<div>
+<span class="text-[10px] text-slate-400 font-bold uppercase block">All-in Quote</span>
+<span class="text-xl font-black text-slate-900 font-mono">$1,620.00</span>
+</div>
+<button class="px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm transition-all cursor-pointer" id="btn-award-apex" onclick="awardBid('Apex Logistics LLC', '$1,620.00')">
+                  Award Load
+                </button>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-slate-600">
+<div class="flex items-center space-x-2">
+<span class="material-symbols-outlined text-base text-emerald-600">verified_user</span>
+<span>$2,000,000 Cargo Insurance Active</span>
+</div>
+<div class="flex items-center space-x-2">
+<span class="material-symbols-outlined text-base text-blue-600">bolt</span>
+<span>Instant dispatch upon award</span>
+</div>
+<div class="flex items-center space-x-2">
+<span class="material-symbols-outlined text-base text-slate-500">timer</span>
+<span>Pickup guaranteed 09:00 AM sharp</span>
+</div>
+</div>
+</div>
+<!-- Bid 2: SwiftTrans Freight -->
+<div class="bg-white rounded-xl border border-slate-200 p-5 shadow-xs space-y-4" id="bid-card-swift">
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+<div class="flex items-center space-x-3">
+<div class="h-10 w-10 rounded-xl bg-slate-100 text-slate-700 font-black text-sm flex items-center justify-center border border-slate-200">
+                  ST
+                </div>
+<div>
+<h3 class="text-base font-bold text-slate-900">SwiftTrans Freight Inc</h3>
+<p class="text-xs text-slate-500 font-medium">96.8% On-time delivery • 12 trips completed</p>
+</div>
+</div>
+<div class="flex items-center space-x-6">
+<div>
+<span class="text-[10px] text-slate-400 font-bold uppercase block">Vehicle</span>
+<span class="text-xs font-bold text-slate-800">53 ft Dry Van</span>
+</div>
+<div>
+<span class="text-[10px] text-slate-400 font-bold uppercase block">All-in Quote</span>
+<span class="text-xl font-black text-slate-900 font-mono">$1,690.00</span>
+</div>
+<button class="px-5 py-2.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-800 text-xs font-bold transition-all cursor-pointer" id="btn-award-swift" onclick="awardBid('SwiftTrans Freight Inc', '$1,690.00')">
+                  Award Load
+                </button>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-slate-600">
+<div class="flex items-center space-x-2">
+<span class="material-symbols-outlined text-base text-emerald-600">verified_user</span>
+<span>$1,000,000 Cargo Insurance</span>
+</div>
+<div class="flex items-center space-x-2">
+<span class="material-symbols-outlined text-base text-slate-500">route</span>
+<span>24 mi deadhead to pickup</span>
+</div>
+</div>
+</div>
+<!-- Bid 3: Lone Star Haulers -->
+<div class="bg-white rounded-xl border border-slate-200 p-5 shadow-xs space-y-4" id="bid-card-lonestar">
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+<div class="flex items-center space-x-3">
+<div class="h-10 w-10 rounded-xl bg-slate-100 text-slate-700 font-black text-sm flex items-center justify-center border border-slate-200">
+                  LS
+                </div>
+<div>
+<h3 class="text-base font-bold text-slate-900">Lone Star Haulers</h3>
+<p class="text-xs text-slate-500 font-medium">94.1% On-time delivery • 5 trips completed</p>
+</div>
+</div>
+<div class="flex items-center space-x-6">
+<div>
+<span class="text-[10px] text-slate-400 font-bold uppercase block">Vehicle</span>
+<span class="text-xs font-bold text-slate-800">53 ft Dry Van</span>
+</div>
+<div>
+<span class="text-[10px] text-slate-400 font-bold uppercase block">All-in Quote</span>
+<span class="text-xl font-black text-slate-900 font-mono">$1,750.00</span>
+</div>
+<button class="px-5 py-2.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-800 text-xs font-bold transition-all cursor-pointer" id="btn-award-lonestar" onclick="awardBid('Lone Star Haulers', '$1,750.00')">
+                  Award Load
+                </button>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- END: Main Content Area -->
+</div>
+<!-- END: Layout Wrapper -->
+<!-- Script Logic & State Machine -->
+<script>
+    // State store
+    const state = {
+      role: 'carrier', // 'carrier' | 'shipper'
+      activeCarrierTab: 'requirements', // 'overview' | 'requirements' | 'fleet' | 'bids' | 'assigned'
+      activeShipperTab: 'procurement',
+      selectedLoadId: 'IP-19320',
+      assignedLoads: [
+        {
+          id: 'FG-77102',
+          shipper: 'SouthMart Retail',
+          route: 'Houston, TX → San Antonio, TX',
+          driver: 'Derrick Boone',
+          truck: 'Unit #312 Volvo Reefer',
+          status: 'In Transit (Mile 140 / 197)',
+          eta: 'Today • 3:30 PM CST'
+        }
+      ],
+      requirements: [
+        {
+          id: 'AC-48291',
+          company: 'Vertex Motors',
+          route: 'Dallas, TX → Houston, TX',
+          origin: 'Dallas, TX',
+          dest: 'Houston, TX',
+          product: 'Auto components',
+          weight: '36,000 lbs',
+          weightVal: 36000,
+          vehicle: '53 ft Dry Van',
+          pickup: 'Aug 10 • 9:00 AM CST',
+          fit: '99%',
+          fitClass: 'bg-blue-50 text-blue-600',
+          recommendedUnit: 'Unit #108 • Kenworth T680',
+          truckSubtitle: '53 ft Dry Van • 45,000 lbs max payload',
+          driver: 'Elena Rostova',
+          deadhead: '12 mi',
+          contribution: '$1,620',
+          deadline: 'Aug 11 • 2:00 PM CST',
+          bids: '4 bids',
+          instructions: 'Dock 4 check-in. Pallet jack required on-site. Palletized auto engines and transmissions.',
+          reasons: [
+            '12 miles from pickup (Staged in Fort Worth yard)',
+            'Available immediately for dispatch',
+            'Full dry containment required for finished electronics and parts',
+            'Driver has spotless delivery record with Vertex Motors'
+          ]
+        },
+        {
+          id: 'FG-77102',
+          company: 'SouthMart Retail',
+          route: 'Houston, TX → San Antonio, TX',
+          origin: 'Houston, TX',
+          dest: 'San Antonio, TX',
+          product: 'FMCG pallets',
+          weight: '28,000 lbs',
+          weightVal: 28000,
+          vehicle: '53 ft Reefer',
+          pickup: 'Aug 10 • 3:00 PM CST',
+          fit: '99%',
+          fitClass: 'bg-blue-50 text-blue-600',
+          recommendedUnit: 'Unit #312 • Volvo VNL 860',
+          truckSubtitle: '53 ft Reefer • 44,000 lbs max payload',
+          driver: 'Derrick Boone',
+          deadhead: '9 mi',
+          contribution: '$1,450',
+          deadline: 'Aug 11 • 8:00 AM CST',
+          bids: '6 bids',
+          instructions: 'Pre-cool trailer to 38°F continuous. Driver must supply food-grade sweep certificate.',
+          reasons: [
+            '9 miles from distribution hub in Pearland, TX',
+            'Reefer temperature control auto-synced with dispatch telemetry',
+            'Direct straight-shot route on I-10 W',
+            'Fast 30-min turn at receiver promised'
+          ]
+        },
+        {
+          id: 'IP-19320',
+          company: 'Prime Engineering',
+          route: 'Dallas, TX → Atlanta, GA',
+          origin: 'Dallas, TX',
+          dest: 'Atlanta, GA',
+          product: 'Industrial pumps & valves',
+          weight: '44,000 lbs',
+          weightVal: 44000,
+          vehicle: '53 ft Flatbed',
+          pickup: 'Aug 11 • 8:00 AM CST',
+          fit: '99%',
+          fitClass: 'bg-blue-100 text-blue-700',
+          recommendedUnit: 'Unit #204 • Freightliner Cascadia',
+          truckSubtitle: '53 ft Flatbed • 48,000 lbs max payload',
+          driver: 'Marcus Vance',
+          deadhead: '18 mi',
+          contribution: '$1,840',
+          deadline: 'Aug 13 • 5:00 PM EST',
+          bids: '7 bids',
+          instructions: 'Facility overhead crane loading available. Requires chains and 8ft drop tarps. Driver must check in by 07:30 AM CST.',
+          reasons: [
+            '18 miles from pickup (Staged in Arlington, TX)',
+            'Available Today • 5:40 PM CST after Houston inbound leg',
+            'Completing Houston → Dallas inbound route',
+            'Capacity covers the 44,000 lbs requirement comfortably',
+            'Vehicle type and heavy strapping equipment is an exact match'
+          ]
+        },
+        {
+          id: 'ST-77411',
+          company: 'BuildCore Materials',
+          route: 'Houston, TX → Dallas, TX',
+          origin: 'Houston, TX',
+          dest: 'Dallas, TX',
+          product: 'Steel coils',
+          weight: '46,000 lbs',
+          weightVal: 46000,
+          vehicle: '53 ft Flatbed',
+          pickup: 'Aug 10 • 6:00 PM CST',
+          fit: '85%',
+          fitClass: 'bg-slate-100 text-slate-700',
+          recommendedUnit: 'Unit #204 • Freightliner Cascadia',
+          truckSubtitle: '53 ft Flatbed • 48,000 lbs max payload',
+          driver: 'Marcus Vance',
+          deadhead: '34 mi',
+          contribution: '$1,380',
+          deadline: 'Aug 11 • 10:00 AM CST',
+          bids: '3 bids',
+          instructions: 'Heavy coil racks and friction mats strictly mandated by plant safety manager.',
+          reasons: [
+            '34 miles deadhead from current warehouse staging',
+            'Requires coil bunks and edge protectors verified before gate entry',
+            'Optimal backhaul corridor returning to Dallas DFW base'
+          ]
+        },
+        {
+          id: 'FM-20188',
+          company: 'FreshFoods Express',
+          route: 'Dallas, TX → Memphis, TN',
+          origin: 'Dallas, TX',
+          dest: 'Memphis, TN',
+          product: 'Packaged groceries',
+          weight: '38,000 lbs',
+          weightVal: 38000,
+          vehicle: '53 ft Dry Van',
+          pickup: 'Aug 11 • 11:00 AM CST',
+          fit: '92%',
+          fitClass: 'bg-blue-50 text-blue-600',
+          recommendedUnit: 'Unit #108 • Kenworth T680',
+          truckSubtitle: '53 ft Dry Van • 45,000 lbs max payload',
+          driver: 'Elena Rostova',
+          deadhead: '15 mi',
+          contribution: '$1,590',
+          deadline: 'Aug 12 • 4:00 PM CST',
+          bids: '5 bids',
+          instructions: 'Clean swept trailer, no pungent odor residues. Driver assist not required.',
+          reasons: [
+            '15 miles from pickup terminal in Garland, TX',
+            'Standard dry freight payload matches Unit #108 specifications',
+            'Direct interstate corridor with established fuel discount stops'
+          ]
+        }
+      ],
+      filteredRequirements: []
+    };
+
+    // Initialize state
+    state.filteredRequirements = [...state.requirements];
+
+    // DOM Ready
+    window.addEventListener('DOMContentLoaded', () => {
+      renderRequirementsTable();
+      updateDetailDrawer(state.selectedLoadId);
+      renderAssignedTrips();
+    });
+
+    // WORKFLOW 1: ROLE SWITCHER
+    function switchRole(role) {
+      state.role = role;
+      const btnCarrier = document.getElementById('btn-role-carrier');
+      const btnShipper = document.getElementById('btn-role-shipper');
+      const carrierNav = document.getElementById('carrier-nav');
+      const shipperNav = document.getElementById('shipper-nav');
+      const profileName = document.getElementById('profile-name');
+      const profileCompany = document.getElementById('profile-company');
+      const profileAvatar = document.getElementById('profile-avatar');
+      const roleTagPill = document.getElementById('role-tag-pill');
+      const sidebarRoleLabel = document.getElementById('sidebar-role-label');
+      const sidebarHubName = document.getElementById('sidebar-hub-name');
+
+      // Hide all main containers
+      document.getElementById('view-carrier-requirements').classList.add('hidden');
+      document.getElementById('view-carrier-overview').classList.add('hidden');
+      document.getElementById('view-carrier-fleet').classList.add('hidden');
+      document.getElementById('view-carrier-bids').classList.add('hidden');
+      document.getElementById('view-carrier-assigned').classList.add('hidden');
+      document.getElementById('view-shipper-procurement').classList.add('hidden');
+
+      if (role === 'carrier') {
+        btnCarrier.className = 'flex items-center space-x-2 px-4 py-1.5 rounded-lg bg-blue-600 text-white font-semibold text-xs shadow-sm transition-all';
+        btnShipper.className = 'flex items-center space-x-2 px-4 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 font-semibold text-xs transition-all';
+        carrierNav.classList.remove('hidden');
+        shipperNav.classList.add('hidden');
+        sidebarRoleLabel.textContent = 'FREIGHT COMPANY';
+        sidebarHubName.textContent = 'Midwest & Texas Operations Hub';
+        profileName.textContent = 'Sarah Jenkins';
+        profileCompany.textContent = 'Apex Logistics LLC';
+        profileAvatar.textContent = 'SJ';
+        roleTagPill.textContent = 'Carrier Workspace';
+        switchCarrierTab('requirements');
+        showToast('Switched to Freight Company Workspace (Apex Logistics)');
+      } else {
+        btnShipper.className = 'flex items-center space-x-2 px-4 py-1.5 rounded-lg bg-blue-600 text-white font-semibold text-xs shadow-sm transition-all';
+        btnCarrier.className = 'flex items-center space-x-2 px-4 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 font-semibold text-xs transition-all';
+        carrierNav.classList.add('hidden');
+        shipperNav.classList.remove('hidden');
+        sidebarRoleLabel.textContent = 'SHIPPER PROCUREMENT';
+        sidebarHubName.textContent = 'Vertex Logistics Central';
+        profileName.textContent = 'David Keller';
+        profileCompany.textContent = 'Vertex Motors Logistics';
+        profileAvatar.textContent = 'VM';
+        roleTagPill.textContent = 'Shipper Portal';
+        document.getElementById('view-shipper-procurement').classList.remove('hidden');
+        showToast('Switched to Shipper Procurement (Vertex Motors)');
+      }
+    }
+
+    // WORKFLOW 2: SIDEBAR SCREEN-TO-SCREEN TRANSITIONS
+    function switchCarrierTab(tab) {
+      state.activeCarrierTab = tab;
+      const views = ['requirements', 'overview', 'fleet', 'bids', 'assigned'];
+      views.forEach(v => {
+        const el = document.getElementById(`view-carrier-${v}`);
+        if (el) el.classList.add('hidden');
+        const navBtn = document.getElementById(`nav-carrier-${v}`);
+        if (navBtn) {
+          if (v === tab) {
+            navBtn.className = 'w-full flex items-center px-3.5 py-2.5 rounded-lg bg-[#1E293B] text-white text-sm font-semibold shadow-inner transition-colors text-left';
+          } else {
+            navBtn.className = 'w-full flex items-center px-3.5 py-2.5 rounded-lg text-slate-300 hover:bg-white/5 hover:text-white text-sm font-medium transition-colors text-left';
+          }
+        }
+      });
+
+      const targetView = document.getElementById(`view-carrier-${tab}`);
+      if (targetView) {
+        targetView.classList.remove('hidden');
+        targetView.classList.add('fade-in');
+      }
+    }
+
+    function switchShipperTab(tab) {
+      if (tab === 'procurement') {
+        document.getElementById('view-shipper-procurement').classList.remove('hidden');
+      } else {
+        showToast(`Navigating to ${tab.replace('-', ' ')}...`);
+      }
+    }
+
+    // WORKFLOW 3: SEARCH & FILTER WORKFLOW
+    function applyRequirementFilters() {
+      const origin = document.getElementById('starting-point').value.trim().toLowerCase();
+      const dest = document.getElementById('destination-city').value.trim().toLowerCase();
+      const product = document.getElementById('load-product').value.trim().toLowerCase();
+      const vehicle = document.getElementById('vehicle-type').value;
+      const minCap = parseInt(document.getElementById('min-capacity').value, 10);
+
+      state.filteredRequirements = state.requirements.filter(item => {
+        if (origin && !item.origin.toLowerCase().includes(origin)) return false;
+        if (dest && !item.dest.toLowerCase().includes(dest)) return false;
+        if (product && !item.product.toLowerCase().includes(product)) return false;
+        if (vehicle !== 'ALL' && item.vehicle !== vehicle) return false;
+        if (minCap > 0 && item.weightVal < minCap) return false;
+        return true;
+      });
+
+      const count = state.filteredRequirements.length;
+      document.getElementById('filter-count-label').textContent = `${count} requirement${count === 1 ? '' : 's'} match`;
+      document.getElementById('nav-badge-reqs').textContent = count;
+      document.getElementById('reset-filter-btn').classList.remove('hidden');
+
+      renderRequirementsTable();
+      if (count > 0) {
+        // Automatically select the first visible load
+        updateDetailDrawer(state.filteredRequirements[0].id);
+      }
+      showToast(`Filter applied: Showing ${count} requirements`);
+    }
+
+    function resetFilters() {
+      document.getElementById('starting-point').value = '';
+      document.getElementById('destination-city').value = '';
+      document.getElementById('load-product').value = '';
+      document.getElementById('vehicle-type').value = 'ALL';
+      document.getElementById('min-capacity').value = '0';
+      document.getElementById('reset-filter-btn').classList.add('hidden');
+      state.filteredRequirements = [...state.requirements];
+      document.getElementById('filter-count-label').textContent = `${state.filteredRequirements.length} requirements`;
+      document.getElementById('nav-badge-reqs').textContent = state.filteredRequirements.length;
+      renderRequirementsTable();
+      showToast('Filters cleared');
+    }
+
+    function filterByCorridor(origin, dest) {
+      switchCarrierTab('requirements');
+      document.getElementById('starting-point').value = origin;
+      document.getElementById('destination-city').value = dest;
+      applyRequirementFilters();
+    }
+
+    function findLoadsForTruck(vehicleType, origin) {
+      switchCarrierTab('requirements');
+      document.getElementById('vehicle-type').value = vehicleType;
+      document.getElementById('starting-point').value = origin;
+      applyRequirementFilters();
+      showToast(`Displaying match candidates for ${vehicleType} from ${origin}`);
+    }
+
+    // Render table
+    function renderRequirementsTable() {
+      const tbody = document.getElementById('requirements-table-body');
+      tbody.innerHTML = '';
+
+      if (state.filteredRequirements.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="8" class="text-center py-10 text-slate-400 text-xs font-semibold">
+              No freight requirements match your criteria. Try loosening filters.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      state.filteredRequirements.forEach(req => {
+        const isSelected = req.id === state.selectedLoadId;
+        const tr = document.createElement('tr');
+        tr.className = isSelected 
+          ? 'bg-blue-50/40 border-l-4 border-l-blue-600 transition-colors cursor-pointer' 
+          : 'hover:bg-slate-50/70 transition-colors cursor-pointer';
+
+        tr.onclick = (e) => {
+          // If clicked the button specifically, still select
+          updateDetailDrawer(req.id);
+        };
+
+        tr.innerHTML = `
+          <td class="py-3.5 px-4 whitespace-nowrap">
+            <div class="font-bold text-slate-900 flex items-center gap-1.5">
+              ${req.id}
+              ${isSelected ? '<span class="inline-block w-2 h-2 rounded-full bg-blue-600"></span>' : ''}
+            </div>
+            <div class="text-xs text-slate-500 font-medium">${req.company}</div>
+          </td>
+          <td class="py-3.5 px-4 whitespace-nowrap font-bold text-slate-900">${req.route}</td>
+          <td class="py-3.5 px-4 whitespace-nowrap text-slate-600 text-xs font-medium">${req.product}</td>
+          <td class="py-3.5 px-4 whitespace-nowrap font-bold text-slate-800 text-xs">${req.weight}</td>
+          <td class="py-3.5 px-4 whitespace-nowrap text-xs text-slate-600">${req.vehicle}</td>
+          <td class="py-3.5 px-4 whitespace-nowrap text-xs text-slate-600">${req.pickup}</td>
+          <td class="py-3.5 px-4 whitespace-nowrap text-center">
+            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-extrabold ${req.fitClass}">
+              ${req.fit} fleet fit
+            </span>
+          </td>
+          <td class="py-3.5 px-4 whitespace-nowrap text-right">
+            <button onclick="event.stopPropagation(); updateDetailDrawer('${req.id}');" class="${isSelected ? 'px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-bold shadow-xs hover:bg-blue-700' : 'px-3 py-1.5 rounded-lg border border-slate-200 text-slate-800 text-xs font-bold hover:bg-slate-50 hover:border-slate-300'} transition-all cursor-pointer" type="button">
+              ${isSelected ? 'Active Match' : 'View & assign'}
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // WORKFLOW 4: REQUIREMENT ROW SELECTION & DRAWER DETAIL
+    function updateDetailDrawer(loadId) {
+      state.selectedLoadId = loadId;
+      const load = state.requirements.find(r => r.id === loadId);
+      if (!load) return;
+
+      const drawer = document.getElementById('load-detail-drawer');
+      drawer.classList.remove('hidden');
+
+      // Fill info
+      document.getElementById('detail-tag-header').textContent = `${load.id} • ${load.company.toUpperCase()}`;
+      document.getElementById('detail-route-title').textContent = load.route;
+      document.getElementById('detail-summary-line').textContent = `${load.product} • ${load.weight} • ${load.vehicle}`;
+      document.getElementById('detail-pickup').textContent = load.pickup;
+      document.getElementById('detail-deadline').textContent = load.deadline;
+      document.getElementById('detail-bids').textContent = load.bids;
+      document.getElementById('detail-product').textContent = load.product;
+      document.getElementById('detail-weight').textContent = load.weight;
+      document.getElementById('detail-vehicle').textContent = load.vehicle;
+      document.getElementById('detail-instructions').textContent = load.instructions;
+      document.getElementById('detail-fit-score').textContent = load.fit;
+      document.getElementById('detail-truck-title').textContent = load.recommendedUnit;
+      document.getElementById('detail-truck-subtitle').textContent = load.truckSubtitle;
+      document.getElementById('detail-driver-badge').textContent = `Driver: ${load.driver}`;
+      document.getElementById('detail-deadhead-stat').textContent = load.deadhead;
+      document.getElementById('detail-contribution-stat').textContent = load.contribution;
+
+      // Update bullets
+      const reasonsList = document.getElementById('detail-reasons-list');
+      reasonsList.innerHTML = '';
+      load.reasons.forEach(r => {
+        const li = document.createElement('li');
+        li.className = 'flex items-start';
+        li.innerHTML = `
+          <span class="w-1.5 h-1.5 rounded-full bg-blue-600 mr-2 mt-1.5 shrink-0"></span>
+          <span>${r}</span>
+        `;
+        reasonsList.appendChild(li);
+      });
+
+      renderRequirementsTable();
+    }
+
+    function closeDetailDrawer() {
+      const drawer = document.getElementById('load-detail-drawer');
+      drawer.classList.add('hidden');
+      showToast('Assignment drawer closed');
+    }
+
+    // WORKFLOW 5: 'ASSIGN THIS TRUCK ->' ACTION WORKFLOW
+    function openAssignModal() {
+      const load = state.requirements.find(r => r.id === state.selectedLoadId);
+      if (!load) return;
+
+      document.getElementById('modal-truck-id').textContent = load.recommendedUnit.split('•')[0].trim();
+      document.getElementById('modal-req-id').textContent = `${load.id} (${load.company})`;
+      document.getElementById('modal-route').textContent = load.route;
+      document.getElementById('modal-driver').textContent = load.driver;
+      document.getElementById('modal-contribution').textContent = load.contribution;
+
+      document.getElementById('assign-modal').classList.remove('hidden');
+    }
+
+    function closeAssignModal() {
+      document.getElementById('assign-modal').classList.add('hidden');
+    }
+
+    function confirmAssignTruck() {
+      closeAssignModal();
+      const loadIndex = state.requirements.findIndex(r => r.id === state.selectedLoadId);
+      if (loadIndex === -1) return;
+
+      const load = state.requirements[loadIndex];
+
+      // Add to assigned trips
+      state.assignedLoads.unshift({
+        id: load.id,
+        shipper: load.company,
+        route: load.route,
+        driver: load.driver,
+        truck: load.recommendedUnit,
+        status: 'Dispatched (En route to pickup)',
+        eta: load.pickup
+      });
+
+      // Remove from marketplace
+      state.requirements.splice(loadIndex, 1);
+      state.filteredRequirements = state.filteredRequirements.filter(r => r.id !== load.id);
+
+      // Update counters
+      document.getElementById('nav-assigned-count').textContent = `${state.assignedLoads.length} active`;
+      document.getElementById('nav-badge-reqs').textContent = state.requirements.length;
+
+      // Re-render
+      renderRequirementsTable();
+      renderAssignedTrips();
+
+      if (state.filteredRequirements.length > 0) {
+        updateDetailDrawer(state.filteredRequirements[0].id);
+      } else {
+        closeDetailDrawer();
+      }
+
+      showToast(`Trip Assigned to ${load.recommendedUnit.split('•')[0].trim()} (${load.driver})! Rate confirmation dispatched.`);
+    }
+
+    function renderAssignedTrips() {
+      const container = document.getElementById('assigned-trips-container');
+      container.innerHTML = '';
+
+      state.assignedLoads.forEach(trip => {
+        const div = document.createElement('div');
+        div.className = 'bg-white rounded-xl border border-slate-200 p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4 fade-in';
+        div.innerHTML = `
+          <div class="space-y-1">
+            <div class="flex items-center space-x-2">
+              <span class="font-bold text-slate-900 text-base">${trip.id}</span>
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700">${trip.status}</span>
+            </div>
+            <p class="text-xs font-semibold text-slate-800">${trip.route} • ${trip.shipper}</p>
+            <p class="text-xs text-slate-500">Driver: ${trip.driver} • ${trip.truck}</p>
+          </div>
+          <div class="flex items-center space-x-4">
+            <div class="text-right">
+              <span class="text-[11px] text-slate-400 block font-medium">Pickup / ETA</span>
+              <span class="text-xs font-bold text-slate-900">${trip.eta}</span>
+            </div>
+            <button onclick="showToast('Driver ${trip.driver} notified. GPS Ping transmitted.')" class="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50">Track GPS</button>
+          </div>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    // Shipper Bidding Workflow
+    function awardBid(carrierName, amount) {
+      showToast(`Load AC-48291 Awarded to ${carrierName} for ${amount}! Rate Confirmation generated.`);
+      
+      const btn = document.getElementById('btn-award-apex');
+      if (carrierName.includes('Apex')) {
+        btn.textContent = '✓ Awarded';
+        btn.className = 'px-5 py-2.5 rounded-lg bg-emerald-600 text-white text-xs font-bold shadow-sm cursor-default';
+        document.getElementById('bid-card-apex').classList.remove('border-blue-500');
+        document.getElementById('bid-card-apex').classList.add('border-emerald-500', 'bg-emerald-50/20');
+      }
+    }
+
+    // Counter-bid Modal
+    let activeBidLoadId = null;
+    function openBidModal(loadId, shipper, defaultRate) {
+      activeBidLoadId = loadId;
+      document.getElementById('bid-modal-subtitle').textContent = `Submitting revision for ${loadId} • ${shipper}`;
+      document.getElementById('bid-rate-input').value = defaultRate;
+      document.getElementById('bid-modal').classList.remove('hidden');
+    }
+
+    function closeBidModal() {
+      document.getElementById('bid-modal').classList.add('hidden');
+    }
+
+    function submitBidRevision() {
+      const rate = document.getElementById('bid-rate-input').value;
+      closeBidModal();
+      if (activeBidLoadId === 'ST-77411') {
+        document.getElementById('bid-val-ST77411').textContent = `$${rate}`;
+      }
+      showToast(`Counter-bid of $${rate} transmitted to shipper! Under real-time review.`);
+    }
+
+    // Toast Utility
+    function showToast(message) {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = 'toast-slide bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl border border-slate-700 flex items-center space-x-3 text-xs pointer-events-auto max-w-md';
+      toast.innerHTML = `
+        <span class="w-2 h-2 rounded-full bg-emerald-400 shrink-0"></span>
+        <span class="font-medium">${message}</span>
+      `;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(10px)';
+        toast.style.transition = 'all 0.3s ease';
+        setTimeout(() => toast.remove(), 300);
+      }, 4000);
+    }
+  </script>
+</body></html>
